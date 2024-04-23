@@ -1,0 +1,147 @@
+---
+title: "Child deprivation in low and middle-income countries"
+subtitle : "Have they failed their youth ?"
+author : "Vincent Lestang"
+date : "2024-04-23"
+format:
+  html:
+    theme : simplex 
+    toc: true
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+```{r}
+#| label : setup
+#| include: false
+#| echo : false
+
+# libraries
+library(tidyverse)
+library(plotly)
+
+# data
+unicef_indicator_1 <- read_delim("unicef_indicator_1.csv", 
+    delim = ";", escape_double = FALSE, trim_ws = TRUE)
+unicef_metadata <- read_delim("unicef_metadata.csv", 
+    delim = ";", escape_double = FALSE, trim_ws = TRUE)
+
+#transformations
+unicef_full <- full_join(unicef_indicator_1, unicef_metadata, by =c("country", "time_period" ="year"))
+unicef_graph <- left_join(unicef_indicator_1, unicef_metadata, by =c("country"))
+```
+
+
+## What's at stake ? 
+
+No child deserves to grow up in **poverty**.And yet, today the **number of children living below the national poverty** line in low- and middle-income countries is **unprecedented**. 
+
+
+Children experience poverty as ***the lack of food, shelter, education, water or health services***. The lack of these basic needs often results in deficits that cannot easily be overcome later in life.
+Living without any of these basic social services can leave a child unable to **enjoy their rights and reach their full potential**.
+
+
+In this dashboard, we will shed a light on ***children suffering more than 4 deprivations*** and weave threads between child poverty and the **socio-economic context of the concerned countries.** *(Hover on the graphs to see details !)* 
+```{r}
+map_world <- map_data("world")
+data_jointotal <- unicef_indicator_1 %>%
+  filter (sex == "Total") 
+
+map_data_jointotal <- full_join(data_jointotal, map_world, by =c("country"="region"))
+
+p <- ggplot(map_data_jointotal) + 
+  aes(x = long, y = lat, group = group, fill = obs_value, 
+      text = paste("Country: ", country, "<br>", 
+                   "% of children with exactly 4 deprivations: ", round(obs_value,2), "%")) +
+  geom_polygon() +
+  scale_fill_gradient(low = "yellow", high = "red", na.value = "grey") +
+  labs(
+    title = "% of children with exactly 4 deprivations",
+    subtitle = "Countries in grey have no data due to a mismatch with their names",
+    caption = "Source: Unicef",
+    x = "Longitude",
+    y = "Latitude",
+    fill = "% of children with exactly 4 deprivations"
+  ) +
+  theme_bw()
+
+ggplotly(p, tooltip = "text")
+```
+*"This detailed map provides a quick snapshot of the situation of the % of children with exactly 4 deprivations in some low to middle-income countries. Subsaharian Africa remains one of the most exposed regions to children deprivation."*
+
+
+# How 4D% impacts and gets impacted by other socio-economic factors
+
+The first graph below identifies a clear link between countries' % of children with 4D and their population life expectancy. As expected, subsaharian countries are the most subject to children deprivation, with countries like **Madagascar** or **Ethiopia** totaling more than **15% of children with 4 deprivations.**
+
+
+```{r}
+#Scatter plot 
+
+data_jointotal3 <- unicef_full %>%
+  filter(sex == "Total" & !is.na(obs_value) & !is.na(lifeExp) & obs_value > 0 & lifeExp > 0)
+
+p <- ggplot(data_jointotal3) +
+  aes(obs_value, lifeExp, color = obs_value, text = paste("Country :", country, "<br>",
+                                                          "Life expectancy :", lifeExp, "<br>",
+                                                          "% of children with 4D :", round(obs_value, 2))) +
+  scale_color_gradient(low = "yellow", high = "red", na.value = "grey") +
+  geom_point() +
+  geom_smooth(method = "lm", formula = y ~ log(x), se = FALSE)+
+labs(x = "% of children with 4D", y = "Life expectancy", title="LifeExp and % of children with 4D, a clear correlation",
+caption = "Source: Unicef")+
+theme_minimal()
+ggplotly(p, tooltip ="text")
+```
+
+However, these countries are **emerging** and the populations are (in the mean) **getting richer each year**, as highlighted in the graph belows that shows the evolution of the mean GDP per Capita of these countries over the years. So while financial instability is one of the key factors leading to children deprivation, **it can not be the only explication to the problem.**
+
+
+```{r}
+mean_gdp_per_capita <- unicef_graph %>%
+  group_by(year) %>%
+  summarise(mean_gdp_per_capita = mean(gdpPCap, na.rm = TRUE))
+
+p <- ggplot(mean_gdp_per_capita, aes(x = year, y = mean_gdp_per_capita)) +
+  geom_line(color = "yellow") +
+  geom_point(color = "orange") +
+  labs(x = "Year", y = "Mean GDP", title =  "Evolution of countries' mean GDP per Capita over the years", 
+  caption = "Source: Unicef")+
+   theme_minimal()
+
+print(p)
+```
+
+Furthermore, it seems that countries' populations cannot be clearly linked to their % of children deprivation, as shown by the bar chart below. Such unsafe environments for children indeed have **multidimensionals reasons.**  
+
+```{r}
+#bar chart
+p <- ggplot(unicef_graph, aes(x = reorder(country,pop), y = pop, fill = obs_value,
+                              text = paste("Country: ", country, "<br>",
+                                           "Pop: ", pop, "<br>",
+                                           "% of 4D: ", round(obs_value,2)))) +
+  geom_col() +
+  scale_fill_gradient(low = "yellow", high = "red", na.value = "grey") + 
+  labs(x = "Country", y = "Population,2022", title = "Population and % of Children with 4D",
+       caption = "Source: Unicef")+
+  theme_minimal() +
+    theme(axis.text.x = element_blank())
+   ggplotly(p, tooltip = "text")
+```
+
+
+
+
+
+
+
+
+
+
+## Conclusion : It all comes down to government's priorities
+
+In the end, while poverty is most often defined by income, **it is about more than just money for most children.** It is about growing up in a home without enough heat or nutritious food and being able to afford clean clothes.
+
+
+These deprivations have consequences that ***can last a lifetime.*** In some countries, researches indicates that life is *eight to nine years shorter for a child born in a poor area than a child born in wealthy area.* No matter how tough the socio-economic of these countries is, ensuring their youth's wellness and safeness **must remain their priority.**
